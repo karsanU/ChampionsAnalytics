@@ -1,0 +1,122 @@
+---
+title: "NBA Playoff Factors"
+output:
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+"In this NBA Analysis, we see which variables/factors play a key role in the NBA team wining the playoffs"
+
+```{r,include=FALSE}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(fs)
+library(MASS)
+```
+
+
+
+```{r}
+nbaAllDf = read.csv("NBAMega.csv",header=TRUE)
+
+# drop team names
+drops <- c("Team")
+nbaAllDf <- nbaAllDf[ , !(names(nbaAllDf) %in% drops)]
+names(nbaAllDf)[names(nbaAllDf) == 'ELIETE.DEF.SCORE'] <- 'ELITE.DEF'
+names(nbaAllDf)[names(nbaAllDf) == 'ELIETE.OFF.SCORE'] <- 'ELITE.OFF'
+
+# summery
+names(nbaAllDf)
+```
+
+```{r}
+trainDf =read.csv("trainNBA.csv",header=TRUE)
+
+# drop team names
+drops <- c("Team")
+trainDf <- trainDf[ , !(names(trainDf) %in% drops)]
+names(trainDf)[names(trainDf) == 'ELIETE.DEF.SCORE'] <- 'ELITE.DEF'
+names(trainDf)[names(trainDf) == 'ELIETE.OFF.SCORE'] <- 'ELITE.OFF'
+attach(trainDf)
+```
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+mat=cor(nbaAllDf)
+require(corrplot)
+```
+
+
+```{r}
+png(height=1200, width=1500, pointsize=15, file="NBAoverlap.png")
+corrplot(mat, method = "color", addCoef.col="grey", order = "AOE")
+```
+
+The correlation plot indicates high correlation between elite player variables(ELITE.DEF, ELITE.OFF) and the team’s goal difference along with how well they do in all the Conference Finals and Finals some of these variables must be dropped to avoid multicollinearity in the final model. 3 pints shots, 2 point shots, and free throws are don’t correlate much with any other variables in the dataset.  
+
+
+
+```{r}
+    
+
+model=polr(ordered(Champ) ~ ELITE.DEF + ELITE.OFF + X3P.   , data = trainDf,   Hess = TRUE)
+
+#summary(model)
+drop1(model, test="Chisq")
+stepAIC(model,direction = "backward" )
+```
+The dataset used to create this model contains a total of 15 NBA seasons from year 2003 to 2018. This excludes 2012 as the playoffs were cancelled that year. Each season, 16 teams are selected to the playoffs based on performance, thus we have a dataset of size 240. Logistic regression was used to model the dataset to understand which variables had the most impact on the playoff results. We gave each team a variable between 3 and 0 based on their performance in the playoffs;  a variable defined as “Champ”. The teams that won the playoffs received 3, and a value of 2 was given to the teams that won the conference finals. A value of 1 was assigned to the teams that won that conference semifinals. All the other teams received a value of 0. The training dataset was created using half of the original dataset which had been randomly selected. After performing backwards elimination and using our intuition several variables were considered insignificant and was dropped. We dropped variables such as final win-loss percentage (F.W.L.) and conference semi-final win-loss percentage (CSF.W.L.), as they offered no significant understanding as to what factors led the teams to win. Hence we chose the model: polr(formula = ordered(Champ) ~ ELITE.DEF + ELITE.OFF + X3P.. From this model we can see that both elite defense and offensive players are very influential to a teams chances of winning the NBA playoffs. Also 2 point shots have make the difference when it comes to 2 points shots does not indicate the winner or loser. 
+
+----------------------------------------------------------------------------------------------------
+PLOTS
+```{r}
+ggplot(nbaAllDf,aes(x=Rk,y=ELITE.OFF,colour=as.factor(Rk)))+geom_boxplot()
+```
+
+In this plot the x-axis represent the rank of the team. In rank 1 represents the team that did the best in the playoffs,and 16 represents the team that did the worst. The y-axis elite offensive score which is calculated using total number to elite forward players for the regular season after the trade deadline and total elite players during the playoffs. The teams that made it past the conference semifinals have significantly more elite players then the teams that only made it till the conference first round. There are outliers presents in Ranks 7,8,9, 15 and 16.
+
+```{r}
+ggplot(nbaAllDf,aes(x=Rk,y=ELITE.DEF,colour=as.factor(Rk)))+geom_boxplot()
+```
+In this plot x-axis represents rank of the team as explained previously. The y-axis represents elite defensive score which is calculated using total number to elite defensive players for the regular season after the trade deadline and total elite defensive players during the playoffs. There are outliers present for ranks 6,7,8,15 and 16. Overall we see the trend of the teams that make it further in the pay off having an increasing number of elite players.
+
+```{r}
+ggplot(nbaAllDf,aes(x=Rk,y=X3P.,colour=as.factor(Rk)))+geom_boxplot()
+```
+In this plot x-axis represents rank of the team as explained previously. Y-axis represent the percentage of 3 point shots out of all the points scored. There are a few outliers present for the 1st, 7th, 13th, and 14th ranks however the overall trend shows that the teams that rank higher score more 2 point shots.
+
+
+```{r}
+ggplot(nbaAllDf,aes(x=ELITE.DEF,y=DIFF))+geom_point()+geom_smooth(method="lm")
+ggplot(nbaAllDf,aes(x=ELITE.OFF,y=DIFF))+geom_point()+geom_smooth(method="lm")
+detach(trainDf)
+
+# create data
+time <- as.numeric(rep(seq(1,7),each=7))  # x Axis
+value <- runif(49, 10, 100)               # y Axis
+group <- rep(LETTERS[1:7],times=7)        # group, one shape per group
+data <- data.frame(time, value, group)
+
+# stacked area chart
+ggplot(data, aes(x=time, y=value, fill=group)) + 
+    geom_area()
+
+```
+
+These two plots indicate that the major point difference between teams positively correlates with the elite defensive and offensive players that are present on the team. However, we can see from these graphs that increase of elite defensive players tend to create more of a goal difference then increase in elite offensive player.  
+
+
+
+
+
+

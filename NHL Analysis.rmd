@@ -1,0 +1,116 @@
+---
+title: "R Notebook"
+output:
+  html_notebook: defaut
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(fs)
+library(MASS)
+```
+
+
+
+
+```{r}
+NHLALL = read.csv("NHLMega.csv",header=TRUE)
+head(NHLALL)
+```
+
+```{r}
+train=read.csv("trainNHL.csv",header=TRUE)
+```
+
+
+#CORRELATION PLOT
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+mat=cor(NHLALL)
+require(corrplot)
+
+```
+
+```{r}
+png(height=1200, width=1500, pointsize=15, file="NHLoverlap.png")
+corrplot(mat, method = "color", addCoef.col="grey", order = "AOE")
+```
+
+From the correlation plot above, we see that NHL Champions has a relatively strong correlation with F.W.L.(Finals Win Percentage), as expected because the team with the highest Finals Win Percentage will be the NHL Champions. It is also important to notice these pairs of variables with a very high correlation between the independent variables, we cannot overlook them: F.W.L-0.93, GP-0.91, F.GP(Number of Final Games PLayed) and G-0.89(Goals Scored), ELITE.F-0.83,ELITE.D-0.81 and ELITE.GK-0.49. We may need to drop some of these variables when creating the model. 
+
+
+```{r}
+train %>% mutate(Champs2=case_when(
+  Champs == 8 ~ 3,
+  between(Champs, 6, 7) ~ 2,
+  between(Champs, 2, 5) ~ 1,
+  TRUE ~ 0 
+)) -> train2
+
+head(train2)
+```
+
+
+
+```{r}
+half=polr(ordered(Champs2) ~ ELITE.D + ELITE.F + CQF.W.L., data = train2, Hess = TRUE)
+summary(half)
+drop1(half, test="Chisq")
+```
+For this dataset, we looked at 16 teams from 16 different NHL seasons, so in total, we have a dataset of size 256. Hence, when we create our Training data set we would randomly choose 50% of the data from the original data set. We used logistic regression to get a better understanding of the model to determine which variables have an influence on the model. After performing backward elimination and using our intuition, several variables were considered insignificant and were dropped. Variables such as F.W.L(Finals Win Percentage) were dropped based on our intuition because it is very evident that if you make it to the finals you have a higher chance to win the Championship. The variable DIFF(Goal Difference) was dropped because it was insignificant to the model and this can be further proven from the scatter plots below. When we observe both scatter plots we can see the better the players a team has, the higher the Goal Difference. If we were to look at the scatter plot observing the number of ELITE.F (Elite Forwards) a team has, the more goals will be scored which will result in the teams having a higher Goal Difference. If we were to also observe the regression line, it clearly indicates as the number of Elite Forward increases, the higher the Goal Difference. The same can be said about the scatter plot which observes ELITE.D (Elite Defenders), the more Elite Defenders fewer goals will be scored against a team which will result in the teams having a higher Goal Difference. If we were to also observe the regression line it clearly indicates as the number of Elite Defenders increase, the higher the Goal Difference. Due to these two scatter plots we’ve decided that DIFF was an insignificant variable and have decided to drop it. Our final model is polr(formula = ordered(Champs2) ~ ELITE.D + ELITE.F + CQF.W.L. We have discovered from this model that ELITE.F(Elite Forwards) are more significant then ELITE.D(Elite Defenders) in winning championships. From this, we can acknowledge that it is important to have both great defenders and forwards, however, the more Elite Forwards your team has, the higher the chance you have of winning the NHL Stanley Cup Championship. This can be further proven from observing the box-plots below. As we can see the best team Rk-1 has the most number of Elite Forwards. Whereas for Elite Defenders we can see the best team Rk-1 has a lot of Elite Defenders yet they do not have the most. Hence, Elite Forwards are more significant then Elite Defenders in winning the NHL Stanley Cup Championship. It is also important to point out another significant variable CQF.W.L. From the model and box-plot below it shows it is very important to have a high Conference Quarter-Final Win percentage yet you do not need to have the highest.
+
+
+##############
+PLOTS
+```{r}
+ggplot(NHLALL,aes(x=Rk,y=ELITE.F,colour=as.factor(Rk)))+geom_boxplot()
+```
+As we see in the boxplot, the x-axis is the Variable Rk where it ranges from Rk-1 which is the team that won the Championship till Rk-16, the team that did the worst. The y-axis indicates the number of Elite forawrds each team has and it is evident t hat there are outliers in teams ranked 2,4,6,7,8,9,10,11,12,13,14,15,and 16. It is also important to note that the teams with the most number of Elite Forwards tend to be closer in winning the championship. In this boxplot it cleary indicated that the team Rk-1(who won the championship), has the highest number of Elite Forwards on their team. It is also important to point out that Rk-8 has more Elite forwards then Rk-7, but Rk-7 still finishes one spot above Rk-8.
+
+```{r}
+ggplot(NHLALL,aes(x=Rk,y=ELITE.D,colour=as.factor(Rk)))+geom_boxplot()
+```
+As we see in the boxplot, the x-axis is the Variable Rk where it ranges from Rk-1 which is the team that won the Championship till Rk-16, the team that did the worst. The y-axis indicates the number of Elite Defenders each team has and it is evident that there are outliers in all the teams except teams Rk-3,Rk-4, Rk-6 and Rk-7. It is also important to note that the teams with the most number of Elite Defenders tend to be closer in winning the championship. However, in this boxplot it cleary indicated that the team Rk-1(who won the championship), does not have the highest number of Elite Defenders on their team. Rk-2 has a higher variability then Rk-1 (who won the championship).This indicates that it is important to have a very good number of Elite Defenders more than 14 other teams to win the championship, however you do not need to have the most.
+
+```{r}
+ggplot(NHLALL,aes(x=Rk,y=ELITE.GK,colour=as.factor(Rk)))+geom_boxplot()
+```
+As we see in the boxplot, the x-axis is the Variable Rk where it ranges from Rk-1 which is the team that won the Championship till Rk-16, the team that did the worst. The y-axis indicates the number of Elite Goalies each team has and it is evident that there are outliers in all the teams  It is also important to note that the teams with the most number of Elite Goalies tend to be closer in winning the championship. However, in this boxplot it cleary indicated that the team Rk-1(who won the championship), does not have the highest number of Elite Goalies on their team. Rk-2,Rk-4,Rk-5,Rk-6 and Rk-7 has a higher variability then Rk-1 (who won the championship).This indicates that it is important to have a good number of Elite Goalies to win the championship, however you do not need to have the most.
+
+
+From observing the following 3 box-plots above we can see that all three positions are important. However, ELITE.F (Elite Forwards) are what wins championships. When we look at the box-plot which observes ELITE.GK (Elite Goalkeepers) it  indicates that it is important to have a good number of Elite Goalies to win the championship primarily to get you into the playoffs, however you do not need to have the most. As we can see teams ranked Rk-2,Rk-4,Rk-5,Rk-6 and Rk-7 has a higher a better Goalkeeper then Rk-1 (who won the championship). Now when we focus on ELITE.D (Elite Defenders) it indicates that it is important to have a very good number of Elite Defenders more than 14 other teams to win the championship, however you do not need to have the most. Having Elite Defenders is cruicial in winning the NHL Championship but it is not the most important factor when observing the box-plot. Now the most significant position in winning the NHL Championship is the number of ELITE.F(Elite Forwards) a team has. Usually the team that won the chammpionship has the most number of Elite Forwards of that season compared to the other 15 teams in the playoffs. Our model also indicates this as well.
+
+```{r}
+ggplot(NHLALL,aes(x=Rk,y=CQF.W.L.,colour=as.factor(Rk)))+geom_boxplot()
+```
+As we see in the boxplot, the x-axis is the Variable Rk where it ranges from Rk-1 which is the team that won the Championship till Rk-16, the team that did the worst. The y-axis indicates the win percentage for each team in Conference Quater Finals. It is evident that there are outliers in all the teams rankings excepts teams ranked, Rk-4,Rk-5,Rk-11 and Rk-16. Based on intution its very evident that the teams ranked from Rk-1 till Rk-8 will have a higher win percentage than teams ranked from Rk-9 till Rk-16. When foccusing on the top 8 teams, the team ranked 1st doesnt have the highest spread of win percentage. Infact teams ranked 2nd and 5th(The Highest) have a higher Conference Quarter Final win percentage then 1st ranked team.
+
+
+```{r}
+ggplot(NHLALL,aes(x=ELITE.F,y=DIFF))+geom_point()+geom_smooth(method="lm")
+```
+From observing the scatter plot which is showing the effect ELITE Forwards have on Goal Difference, it shows the obvious. The more Elite Forwards the more goals will be scored which will result in the teams having a higher Goal Difference. If we were to also observe the regression line it clearly indicates as the number of Elite Forward increase, the higher the Goal Difference.
+
+
+```{r}
+ggplot(NHLALL,aes(x=ELITE.D,y=DIFF))+geom_point()+geom_smooth(method="lm")
+```
+
+
+From observing the scatter plot which is showing the effect ELITE DEFENDERS have on Goal Difference, it shows the obvious. The more Elite Defenders fewer goals will be scored against a team which will result in the teams having a higher Goal Difference. If we were to also observe the regression line it clearly indicates as the number of Elite Defenders increase, the higher the Goal Difference.
+
+
+When we observe both scatter plots we can see the better players a team has the higher the Goal Difference. If where to look at the scatter plot observing the number of Elite Forwards has, the more goals will be scored which will result in the teams having a higher Goal Difference. If we were to also observe the regression line it clearly indicates as the number of Elite Forward increase, the higher the Goal Difference. The same can be said about the scatter plot which observes ELITE.D (Elite Defenders, the more Elite Defenders fewer goals will be scored against a team which will result in the teams having a higher Goal Difference. If we were to also observe the regression line it clearly indicates as the number of Elite Defenders increase, the higher the Goal Difference. However if you look at the regression line for both, the Elite Forwards have a higherslope, this means Elite Forwards are more important in providing a bigger Goal Difference. Hence this further supports our model such that Elite Forwards are more valuable then Elite Defenders.
